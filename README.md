@@ -53,7 +53,11 @@ elsewhere. The process exits nonzero if generated lines contain `ERROR`, unless
 `rdpwrap-offset-update` is a dry-run-first equivalent of upstream
 `autoupdate.bat`. By default it checks the installed `termsrv.dll` version,
 checks the installed `rdpwrap.ini`, generates the candidate content in memory,
-and prints the operations it would perform.
+and prints the operations it would perform. If the installed ini already has
+the current version section, the updater still verifies that generated offset
+entries are present and that `[PatchCodes]` defines every patch-code name
+referenced by those offsets; it can dry-run or apply a small ini repair when
+entries are missing.
 
 ```bash
 rdpwrap-offset-update --print

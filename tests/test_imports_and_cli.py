@@ -5,6 +5,7 @@ import os
 import pytest
 
 from rdpwrap_offset_finder.errors import BackendUnavailable
+from rdpwrap_offset_finder.models import VersionInfo
 
 
 def test_public_modules_import_without_optional_runtime_dependencies() -> None:
@@ -32,6 +33,16 @@ def test_cli_requires_path_on_non_windows(capsys: pytest.CaptureFixture[str]) ->
     assert cli.main([]) == 2
     captured = capsys.readouterr()
     assert "termsrv.dll path is required" in captured.err
+
+
+def test_cli_auto_prefers_nosymbol_for_recent_26100_builds() -> None:
+    from rdpwrap_offset_finder import cli
+
+    assert cli._prefers_nosymbol_auto(VersionInfo.parse("10.0.26100.8376"))
+    assert cli._prefers_nosymbol_auto(VersionInfo.parse("10.0.26100.8728"))
+    assert cli._prefers_nosymbol_auto(VersionInfo.parse("10.0.26200.8737"))
+    assert not cli._prefers_nosymbol_auto(VersionInfo.parse("10.0.26100.8375"))
+    assert not cli._prefers_nosymbol_auto(VersionInfo.parse("10.0.19041.4474"))
 
 
 def test_cli_help_exits_successfully() -> None:

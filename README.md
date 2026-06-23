@@ -44,9 +44,11 @@ rdpwrap-offset-finder --backend symbols C:\Windows\System32\termsrv.dll
 rdpwrap-offset-finder --backend nosymbol ./termsrv.dll
 ```
 
-`--backend auto` is the default. It uses `symbols` on Windows and `nosymbol`
-elsewhere. The process exits nonzero if generated lines contain `ERROR`, unless
-`--allow-errors` is supplied.
+`--backend auto` is the default. It uses `nosymbol` for recent Windows 11
+`10.0.26100.8376+` builds, where field reports show the PE/pattern backend is
+more reliable for the moving `DefPolicyPatch` layout, and `symbols` for older
+Windows builds. The process exits nonzero if generated lines contain `ERROR`,
+unless `--allow-errors` is supplied.
 
 ## Autoupdate
 

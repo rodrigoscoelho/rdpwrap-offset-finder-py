@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from .errors import RDPWrapOffsetFinderError
-from .models import FinderResult
+from .models import FinderResult, VersionInfo
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,7 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--backend",
         choices=("auto", "symbols", "nosymbol"),
         default="auto",
-        help="Finder backend to use. auto uses symbols on Windows and nosymbol elsewhere.",
+        help=(
+            "Finder backend to use. auto uses nosymbol for recent Windows 11 "
+            "26100.8376+ termsrv.dll builds and symbols for older Windows builds."
+        ),
     )
     parser.add_argument(
         "--allow-errors",
@@ -55,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_backend(path: Path, backend: str = "auto") -> FinderResult:
     if backend == "auto":
-        backend = "symbols" if os.name == "nt" else "nosymbol"
+        backend = _auto_backend_name(path)
 
     if backend == "symbols":
         from . import symbols
@@ -68,6 +71,37 @@ def run_backend(path: Path, backend: str = "auto") -> FinderResult:
         return nosymbol.find_offsets(path)
 
     raise ValueError(f"unknown backend: {backend}")
+
+
+def _auto_backend_name(path: Path) -> str:
+    """Choose the safest default backend for the target termsrv.dll."""
+
+    if os.name != "nt":
+        return "nosymbol"
+
+    # Recent Windows 11 24H2/25H2 26100+ builds have repeatedly changed the
+    # DefPolicy layout. Field reports for 26100.8376+ show that the no-symbol
+    # path tracks those layouts better than the PDB-backed path, so avoid making
+    # Windows users remember to pass --backend nosymbol for these builds.
+    try:
+        from .pe_image import PEImage
+
+        image = PEImage(path)
+    except RDPWrapOffsetFinderError:
+        return "symbols"
+
+    if _prefers_nosymbol_auto(image.version):
+        return "nosymbol"
+    return "symbols"
+
+
+def _prefers_nosymbol_auto(version: VersionInfo) -> bool:
+    return (
+        version.major == 10
+        and version.minor == 0
+        and version.build >= 26100
+        and version.revision >= 8376
+    )
 
 
 def _resolve_termsrv_path(value: str | None) -> Path:

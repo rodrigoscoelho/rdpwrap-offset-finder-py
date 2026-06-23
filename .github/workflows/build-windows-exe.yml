@@ -1,0 +1,59 @@
+name: build-windows-exe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'README.md'
+      - '.github/workflows/build-windows-exe.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[test]
+          python -m pip install pyinstaller
+      - name: Test
+        run: python -m pytest -q
+      - name: Create PyInstaller entry points
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          @'
+          from rdpwrap_offset_finder.cli import main
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          '@ | Set-Content -Encoding UTF8 build/rdpwrap_offset_finder_entry.py
+          @'
+          from rdpwrap_offset_finder.autoupdate import main
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          '@ | Set-Content -Encoding UTF8 build/rdpwrap_offset_update_entry.py
+      - name: Build executables
+        shell: pwsh
+        run: |
+          python -m PyInstaller --clean --onefile --name rdpwrap-offset-finder --collect-data rdpwrap_offset_finder build/rdpwrap_offset_finder_entry.py
+          python -m PyInstaller --clean --onefile --name rdpwrap-offset-update --collect-data rdpwrap_offset_finder build/rdpwrap_offset_update_entry.py
+      - name: Smoke test executable help
+        shell: pwsh
+        run: |
+          .\dist\rdpwrap-offset-finder.exe --help
+          .\dist\rdpwrap-offset-update.exe --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rdpwrap-offset-finder-windows
+          path: dist/*.exe
